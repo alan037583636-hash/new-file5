@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f7fb">
+  <meta name="description" content="以互動步驟視覺化 Dijkstra 最短路徑演算法與優先佇列。">
+  <title>Dijkstra 最短路徑派遣｜互動教學</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <main class="page-shell">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">ALGORITHM VISUALIZER · GRAPH THEORY</p>
+        <h1>最短路徑派遣 <span>Dijkstra 演算法</span></h1>
+        <p class="header-copy">跟著優先佇列一步步派遣節點，找出從 A 到 F 的最低成本路線。</p>
+      </div>
+      <div class="header-badge"><span class="live-dot"></span>互動式教學</div>
+    </header>
+
+    <section class="workspace" aria-label="Dijkstra 互動視覺化">
+      <div class="main-column">
+        <section class="card map-card" aria-labelledby="map-title">
+          <div class="card-heading">
+            <div>
+              <p class="section-kicker">NETWORK MAP</p>
+              <h2 id="map-title">加權地圖</h2>
+            </div>
+            <span class="heading-meta">6 節點 <span class="meta-dot">·</span> 8 邊</span>
+          </div>
+
+          <div class="map-frame">
+            <svg id="graph" class="graph" viewBox="0 0 1000 600" role="img" aria-labelledby="graph-title graph-desc">
+              <title id="graph-title">A 到 F 的加權無向圖</title>
+              <desc id="graph-desc">六個節點與八條加權邊，起點為 A，終點為 F。地圖會隨演算法步驟更新。</desc>
+              <g id="edge-layer"></g>
+              <g id="weight-layer"></g>
+              <g id="node-layer"></g>
+            </svg>
+          </div>
+
+          <div class="legend" aria-label="地圖狀態圖例">
+            <span class="legend-item"><i class="legend-node legend-expanding"></i>正在展開</span>
+            <span class="legend-item"><i class="legend-node legend-done"></i>已出爐 (定案)</span>
+            <span class="legend-item"><i class="legend-node legend-queued"></i>在佇列裡</span>
+            <span class="legend-item"><i class="legend-node legend-unvisited"></i>未探索</span>
+            <span class="legend-item"><i class="legend-line legend-relaxing"></i>正被鬆弛的邊</span>
+            <span class="legend-item"><i class="legend-line legend-path"></i>最短路徑</span>
+          </div>
+        </section>
+
+        <section class="card playback-card" aria-label="步驟控制">
+          <div class="control-row">
+            <div class="button-group">
+              <button id="prev-button" class="button button-secondary" type="button" aria-label="上一步">← 上一步</button>
+              <button id="next-button" class="button button-primary" type="button" aria-label="下一步">下一步 →</button>
+              <button id="play-button" class="button button-secondary" type="button" aria-label="自動播放">▶ 自動播放</button>
+              <button id="reset-button" class="button button-quiet" type="button" aria-label="重來">↺ 重來</button>
+            </div>
+            <div class="progress-control">
+              <label class="sr-only" for="step-slider">調整演算法步驟</label>
+              <input id="step-slider" type="range" min="0" max="1" value="0">
+              <output id="step-counter" for="step-slider">0 / 1</output>
+            </div>
+          </div>
+          <p class="keyboard-hint"><kbd>←</kbd> <kbd>→</kbd> 切換步驟 <span>·</span> <kbd>Space</kbd> 播放 / 暫停</p>
+        </section>
+
+        <section id="step-log" class="step-log" aria-live="polite" aria-atomic="true">
+          <div class="log-label-row">
+            <span id="step-badge" class="step-badge">START</span>
+            <span id="step-number" class="step-number">STEP 0</span>
+          </div>
+          <h2 id="step-title">準備派遣</h2>
+          <p id="step-description"></p>
+        </section>
+      </div>
+
+      <aside class="side-column" aria-label="演算法狀態">
+        <section class="card queue-card" aria-labelledby="queue-title">
+          <div class="card-heading compact-heading">
+            <div>
+              <p class="section-kicker">MIN PRIORITY QUEUE</p>
+              <h2 id="queue-title">優先佇列</h2>
+            </div>
+            <span class="queue-format">(DIST, 節點)</span>
+          </div>
+          <p class="queue-caption">距離最小的條目會先出列；舊條目保留至取出時再判斷。</p>
+          <ol id="queue-list" class="queue-list" aria-label="目前優先佇列"></ol>
+          <div id="queue-empty" class="queue-empty" hidden>佇列目前是空的</div>
+
+          <div class="stats-grid" aria-label="演算法統計">
+            <div class="stat-tile"><span>取出次數</span><strong id="stat-pops">0</strong></div>
+            <div class="stat-tile"><span>過期跳過</span><strong id="stat-skips">0</strong></div>
+            <div class="stat-tile"><span>鬆弛成功</span><strong id="stat-relaxes">0</strong></div>
+            <div class="stat-tile"><span>已出爐</span><strong id="stat-finalized">0</strong></div>
+          </div>
+        </section>
+
+        <section class="card table-card" aria-labelledby="table-title">
+          <div class="card-heading compact-heading">
+            <div>
+              <p class="section-kicker">DISTANCE & PARENT</p>
+              <h2 id="table-title">DIST / PARENT 表</h2>
+            </div>
+            <span id="finalized-count" class="finalized-count">出爐 0 / 6</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th scope="col">點</th><th scope="col">DIST</th><th scope="col">PARENT</th><th scope="col">狀態</th></tr>
+              </thead>
+              <tbody id="distance-table"></tbody>
+            </table>
+          </div>
+          <div id="result-summary" class="result-summary" hidden>
+            <span class="result-icon" aria-hidden="true">✓</span>
+            <span>最短距離 <strong>9</strong></span>
+            <span class="result-route">A → B → D → F</span>
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <section class="concept-section" aria-labelledby="concept-heading">
+      <div class="concept-heading">
+        <div>
+          <p class="section-kicker">LEARN THE ALGORITHM</p>
+          <h2 id="concept-heading">概念說明與路線解析</h2>
+        </div>
+        <p>理解每一次出列、鬆弛與定案背後的理由。</p>
+      </div>
+
+      <div class="concept-grid">
+        <article class="card concept-card">
+          <div class="concept-card-heading">
+            <span class="concept-icon" aria-hidden="true">↗</span>
+            <div>
+              <p class="section-kicker">CORE CONCEPT</p>
+              <h3>什麼是 Dijkstra 最短路徑派遣？</h3>
+            </div>
+          </div>
+          <p>在一張所有邊權重皆為非負數的路網圖上，從起點出發，利用「優先佇列 (Priority Queue)」每次永遠先處理「目前已知距離起點最近」的節點，算出起點到每一個地點的最短距離。</p>
+          <div class="concept-points">
+            <div class="concept-point">
+              <span class="point-mark">01</span>
+              <div><h4>為什麼不用 BFS？</h4><p>BFS 只算「經過幾條邊 (站數最少)」，在每條路耗時不同的加權圖上會走錯路；Dijkstra 比較的是「路徑權重總和最小」。</p></div>
+            </div>
+            <div class="concept-point">
+              <span class="point-mark">02</span>
+              <div><h4>鬆弛 (Relax)</h4><p>檢查鄰居時，若發現「經過當前點過去」比「原本記錄的距離」還要嚴格更短 (<code>dist[u] + w &lt; dist[v]</code>)，就更新 <code>dist</code> 與 <code>parent</code> 筆記。</p></div>
+            </div>
+            <div class="concept-point">
+              <span class="point-mark">03</span>
+              <div><h4>過期條目 (Lazy Deletion)</h4><p>更新更短距離時，直接把新條目放進優先佇列，不必花時間去刪除舊條目；等舊條目之後被取出時，發現它的距離比目前記錄的 <code>dist</code> 還大，直接跳過即可。</p></div>
+            </div>
+          </div>
+          <div class="formula-note"><span>鬆弛判斷</span><code>dist[u] + w &lt; dist[v]</code><span>相等時不更新</span></div>
+        </article>
+
+        <article class="card walkthrough-card">
+          <div class="concept-card-heading">
+            <span class="concept-icon route-icon" aria-hidden="true">⌁</span>
+            <div>
+              <p class="section-kicker">ROUTE WALKTHROUGH</p>
+              <h3>本圖 A → F 最短路徑走法完整解析</h3>
+            </div>
+          </div>
+          <ol class="walkthrough-list">
+            <li><span class="walk-number">1</span><div><h4>起點 A (0) 出發</h4><p>探訪鄰居 <b>B</b> (更新為 <code>2</code>, parent=<code>A</code>) 與 <b>C</b> (更新為 <code>5</code>, parent=<code>A</code>)。</p></div></li>
+            <li><span class="walk-number">2</span><div><h4>展開 B (2)</h4><p>發現經由 B 到 C 只要 <code>2 + 1 = 3</code>（比原本直達的 5 更短！），成功鬆弛更新 C (dist=<code>3</code>, parent=<code>B</code>)；同時探訪 D (dist=<code>2+4=6</code>, parent=<code>B</code>)。</p></div></li>
+            <li><span class="walk-number">3</span><div><h4>展開 C (3)</h4><p>探訪 E 並更新 E (dist=<code>3+2=5</code>, parent=<code>C</code>)。</p></div></li>
+            <li><span class="walk-number">4</span><div><h4>跳過舊的 (5, C) 並展開 E (5)</h4><p>佇列取出舊條目 (5, C) 時因過期直接跳過；接著展開 E (5)，檢查 D 時發現 <code>5 + 1 = 6</code> 與原本 D 的 6 平手（未嚴格小於，故不更新 D），接著探訪 F 暫時更新為 <code>5 + 6 = 11</code> (parent=<code>E</code>)。</p></div></li>
+            <li><span class="walk-number">5</span><div><h4>展開 D (6)</h4><p>發現經由 D 到終點 F 只要 <code>6 + 3 = 9</code>（比經由 E 的 11 更短！），成功鬆弛更新 F (dist=<code>9</code>, parent=<code>D</code>)。</p></div></li>
+            <li><span class="walk-number">6</span><div><h4>跳過舊的 (11, F) 並完成回溯</h4><p>將佇列最後的過期條目 (11, F) 跳過後佇列清空。從終點 F 沿 parent 往回找 (F ← D ← B ← A)，正式定案最短路徑為 <strong>A → B → D → F</strong>，最短總距離為 <strong>9</strong>。</p></div></li>
+          </ol>
+          <div class="route-result"><span class="route-result-label">FINAL ROUTE</span><strong>A <i>→</i> B <i>→</i> D <i>→</i> F</strong><span>總距離 <b>9</b></span></div>
+        </article>
+      </div>
+    </section>
+
+    <footer class="page-footer">所有邊皆為無向邊 · 權重為非負數 · 以 Lazy Deletion 管理優先佇列</footer>
+  </main>
+</body>
+</html>
